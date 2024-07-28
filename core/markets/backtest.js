@@ -24,6 +24,7 @@ if(!from.isValid())
 
 if(!to.isValid())
   util.die('invalid `to`');
+    
 
 var Market = function() {
 
@@ -40,9 +41,21 @@ var Market = function() {
   log.write('');
 
   this.reader = new Reader();
-  
 
-  log.debug('*** Requested', requiredHistory, 'minutes of warmup history data, so reading db since', from.format(), 'UTC', 'and start backtest at', daterange.from, 'UTC');
+  console.log('');
+  log.info('Backtest time range:', moment.utc(daterange.from).format(), 'until', to.utc().format());
+  this.reader.mostRecentWindow(from, to, function(localData) {
+    log.info('DB candle consistency: ' + localData.consistency);
+    console.log();
+    
+    if (to.unix() !== localData.to) {
+      log.warn('Not enough history data to perform backtest. Exit!');
+      process.exit(1);
+    }
+  });
+  console.log('');
+
+  log.debug('*** Requested', requiredHistory, 'minutes of warmup history data, so reading db since', from.format(), 'UTC', 'and start backtest at', moment.utc(daterange.from).format(), 'UTC');
 
   this.batchSize = config.backtest.batchSize;
   this.iterator = {
@@ -65,7 +78,6 @@ Market.prototype.get = function() {
     this.iterator.to = to;
     this.ended = true;
   }
-
   this.reader.get(
     this.iterator.from.unix(),
     this.iterator.to.unix(),

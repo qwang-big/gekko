@@ -13,17 +13,19 @@ const { Query } = require('pg');
 var Reader = function(mydb) {
   _.bindAll(this);
 
-  if (mydb === undefined)
+  if (mydb === undefined) {
      this.db = handle;
-  else
+  }
+  else {
      this.db = new pg.Pool({ connectionString: config.postgresql.connectionString + '/' + mydb, });
+  }
 }
 
 // returns the furthest point (up to `from`) in time we have valid data from
 Reader.prototype.mostRecentWindow = function(from, to, next) {
   to = to.unix();
   from = from.unix();
-  var maxAmount = to - from + 1;
+  var maxAmount = ((to - from) / 60) + 1;
   
   this.db.connect((err, client, done) => {
 
