@@ -1,6 +1,6 @@
 {
   "name": "gekko",
-  "version": "2021.0.68.297",
+  "version": "2024.0.68.298",
   "description": "A crypto trading bot for auto trading at various exchanges",
   "keywords": [
     "trading",
@@ -25,7 +25,6 @@
     "commander": "^2.13.0",
     "emailjs": "^1.0.5",
     "fs": "0.0.1-security",
-    "gekko": "0.0.9",
     "humanize-duration": "^3.18.0",
     "koa": "^1.2.0",
     "koa-bodyparser": "^2.2.0",
@@ -36,11 +35,12 @@
     "lodash": "2.x",
     "mathjs": "^5.7.0",
     "moment": "^2.22.2",
+    "node-gyp": "^10.2.0",
     "node-telegram-bot-api": "^0.30.0",
     "opn": "^4.0.2",
-    "pg": "^7.8.0",
-    "pg-connection-string": "^2.0.0",
-    "pg-promise": "^8.5.5",
+    "pg": "^8.12.0",
+    "pg-connection-string": "^2.6.4",
+    "pg-promise": "^11.9.1",
     "promisify-node": "^0.5.0",
     "prompt-lite": "0.1.1",
     "random-ext": "^2.6.1",
@@ -49,10 +49,10 @@
     "semver": "5.4.1",
     "sqlite3": "^4.0.6",
     "stats-lite": "^2.0.4",
-    "talib": "^1.0.6",
+    "talib": "^1.1.6",
     "tiny-promisify": "^0.1.1",
     "toml": "^2.3.0",
-    "tulind": "^0.8.15",
+    "tulind": "^0.8.20",
     "ws": "^6.0.0"
   },
   "devDependencies": {
@@ -64,7 +64,7 @@
     "sinon": "^4.2.0"
   },
   "engines": {
-    "node": ">=10.13.0"
+    "node": ">=20.16.0"
   },
   "license": "MIT",
   "repository": {
