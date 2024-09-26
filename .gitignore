@@ -37,6 +37,7 @@ dwsync.xml
 
 # Folders & files to ignore
 
+cfg
 node_modules
 candles.csv
 cexio.db
@@ -45,8 +46,13 @@ TMP_*
 .idea
 volumes
 config.js
-config-*.js
+Think5*.*
+private
 private-*.js
 private-*.toml
 SECRET-api-keys.json
 exchange/nusadua
+db_backup/*.gz
+strategies/testbear.js
+telegram-config-eth.js.json
+deploy.sh

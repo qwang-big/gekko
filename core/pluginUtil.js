@@ -3,6 +3,7 @@ var async = require('async');
 var Emitter = require('./emitter');
 
 var util = require(__dirname + '/util');
+const colors = require('colors/safe');
 
 var log = require(util.dirs().core + 'log');
 
@@ -66,6 +67,17 @@ var pluginHelper = {
 
     plugin.config = config[plugin.slug];
 
+    if(_.contains(plugin.mandatoryOn, gekkoMode)) {
+      log.warn(
+        'The plugin',
+        plugin.name,
+        'is mandatory for mode',
+        gekkoMode + '.',
+        'It has been enabled.'
+      )
+      plugin.config.enabled = true;
+    }
+    
     if(!plugin.config || !plugin.config.enabled)
       return next();
 
@@ -83,6 +95,9 @@ var pluginHelper = {
     log.info('Setting up:');
     log.info('\t', plugin.name);
     log.info('\t', plugin.description);
+    if (plugin.config.shortTrading) {
+      log.info('\t', colors.red('Using SHORT TRADING performance analyzer'));
+    }
 
     var cannotLoad = pluginHelper.cannotLoad(plugin);
     if(cannotLoad)

@@ -27,24 +27,6 @@
 //    properly when some events wont be emitted.
 var plugins = [
   {
-    name: 'Candle writer',
-    description: 'Store candles in a database',
-    slug: 'candleWriter',
-    async: true,
-    modes: ['realtime', 'importer'],
-    path: config => config.adapter + '/writer',
-    version: 0.1,
-  },
-  {
-    name: 'Trading Advisor',
-    description: 'Calculate trading advice',
-    slug: 'tradingAdvisor',
-    async: true,
-    modes: ['realtime', 'backtest'],
-    emits: true,
-    path: config => 'tradingAdvisor/tradingAdvisor.js',
-  },
-  {
     name: 'IRC bot',
     description: 'IRC module lets you communicate with Gekko on IRC.',
     slug: 'ircbot',
@@ -61,9 +43,10 @@ var plugins = [
     slug: 'telegrambot',
     async: false,
     modes: ['realtime'],
+    emits: ['advice'],
     dependencies: [{
       module: 'node-telegram-bot-api',
-      version: '0.24.0'
+      version: '0.30.0'
     }]
   },
   {
@@ -137,6 +120,7 @@ var plugins = [
     slug: 'paperTrader',
     async: false,
     modes: ['realtime', 'backtest'],
+    mandatoryOn: ['backtest'],
     emits: true,
     path: config => 'paperTrader/paperTrader.js',
   },
@@ -238,6 +222,15 @@ var plugins = [
     greedy: true
   },
   {
+    name: 'Candle writer',
+    description: 'Store candles in a database',
+    slug: 'candleWriter',
+    async: true,
+    modes: ['realtime', 'importer'],
+    path: config => config.adapter + '/writer',
+    version: 0.1,
+  },
+  {
     name: 'Candle Uploader',
     description: 'Upload realtime market candles to an external server',
     slug: 'candleUploader',
@@ -249,12 +242,45 @@ var plugins = [
     }]
   },
   {
+    name: 'Cloud Connector',
+    description: 'Receive remote strategy advices and candles from the Gekko Cloud',
+    slug: 'cloudConnector',
+    async: true,
+    modes: ['realtime'],
+    emits: true,
+    dependencies: [{
+      module: '@xmpp/client',
+      version: '0.6.2'
+    }],
+    path: config => 'cloudConnector/cloudConnector.js',
+  },
+  {
+    name: 'Zignaly Broadcaster',
+    description: 'Push realtime trading advices to the zignaly.com platform',
+    slug: 'zignalyBroadcaster',
+    async: false,
+    modes: ['realtime'],
+    dependencies: [{
+      module: 'axios',
+      version: '0.18.0'
+    }]
+  },
+  {
+    name: 'Trading Advisor',
+    description: 'Calculate trading advice',
+    slug: 'tradingAdvisor',
+    async: true,
+    modes: ['realtime', 'backtest'],
+    emits: true,
+    path: config => 'tradingAdvisor/tradingAdvisor.js',
+  },
+  {
     name: 'Blotter',
     description: 'Writes all buy/sell trades to a blotter CSV file',
     slug: 'blotter',
     async: false,
     modes: ['realtime'],
-  },
+  }
 ];
 
 module.exports = plugins;

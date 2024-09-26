@@ -31,11 +31,9 @@ Gekko.prototype = Object.create(Writable.prototype, {
 if(config.debug && mode !== 'importer') {
   // decorate with more debug information
   Gekko.prototype._write = function(chunk, encoding, _done) {
-
     if(chunk.isFinished) {
       return this.finalize();
     }
-
     const start = moment();
     var relayed = false;
     var at = null;
@@ -47,7 +45,7 @@ if(config.debug && mode !== 'importer') {
           `This will cause Gekko to slow down or stop working completely.`
         ].join(' '));
     }, 1000);
-
+    
     const flushEvents = _.after(this.candleConsumers.length, () => {
       relayed = true;
       clearInterval(timer);
@@ -70,8 +68,8 @@ if(config.debug && mode !== 'importer') {
       this.flushDefferedEvents();
       _done();
     });
-    _.each(this.candleConsumers, function(c) {
-      c.processCandle(chunk, flushEvents);
+    _.each(this.candleConsumers, async function(c) {
+      await c.processCandle(chunk, flushEvents);
     }, this);
   }
 }
@@ -82,7 +80,7 @@ Gekko.prototype.flushDefferedEvents = function() {
     producer => producer.broadcastDeferredEmit()
   );
 
-  // If we braodcasted anything we might have
+  // If we broadcasted anything, we might have
   // triggered more events, recurse until we
   // have fully broadcasted everything.
   if(broadcasted)

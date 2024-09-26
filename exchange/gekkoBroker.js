@@ -58,7 +58,7 @@ class Broker {
     if(config.customInterval) {
       this.interval = config.customInterval;
       this.api.interval = config.customInterval;
-      console.log(new Date, '[GB] setting custom interval to', config.customInterval);
+      console.log(new Date, '[Gekko Broker] setting custom interval to', config.customInterval);
     } else {
       this.interval = this.api.interval || 1500;
     }
@@ -146,7 +146,7 @@ class Broker {
     const order = new orders[type]({
       api: this.api,
       marketConfig: this.marketConfig,
-      capabilities: this.capabilities
+      capabilities: this.capabilities,
     });
 
     // todo: figure out a smarter generic way

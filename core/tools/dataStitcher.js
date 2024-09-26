@@ -6,6 +6,7 @@ var util = require('../util');
 var config = util.getConfig();
 var dirs = util.dirs();
 var log = require(dirs.core + '/log');
+var context;
 
 var Stitcher = function(batcher) {
   this.batcher = batcher;
@@ -47,7 +48,7 @@ Stitcher.prototype.prepareHistoricalData = function(done) {
   if(config.tradingAdvisor.historySize === 0)
     return done();
 
-  var requiredHistory = config.tradingAdvisor.candleSize * config.tradingAdvisor.historySize;
+  var requiredHistory = config.tradingAdvisor.candleSize * (config.tradingAdvisor.historySize+1);
   var Reader = require(dirs.plugins + config.adapter + '/reader');
   
   this.reader = new Reader;
@@ -64,7 +65,8 @@ Stitcher.prototype.prepareHistoricalData = function(done) {
   this.reader.mostRecentWindow(idealStartTime, endTime, function(localData) {
     // now we know what data is locally available, what
     // data would we need from the exchange?
-    
+    log.info('DB candle consistency: ' + localData.consistency);
+
     if(!localData) {
       log.info('\tNo usable local data available, trying to get as much as possible from the exchange..');
       var idealExchangeStartTime = idealStartTime.clone();
@@ -215,18 +217,33 @@ Stitcher.prototype.checkExchangeTrades = function(since, next) {
   });
 }
 
+Stitcher.prototype.batchHistoryData = function(rows, i, next) {
+  setTimeout(function timer(){
+    let arr = [];
+    arr[0] = rows[i];
+    context.batcher.write(arr);
+    context.batcher.flush();
+
+    if (i+1 == rows.length) {
+      log.debug('Strategy warmup with history data is complete');
+      next();
+    }
+    else {
+      context.batchHistoryData(rows, ++i, next);
+    }
+  }, 5);
+}
+
 Stitcher.prototype.seedLocalData = function(from, to, next) {
-  this.reader.get(from, to, 'full', function(err, rows) {
+  this.reader.get(from, to, 'full', async function(err, rows) {
     rows = _.map(rows, row => {
       row.start = moment.unix(row.start);
       return row;
     });
 
-    this.batcher.write(rows);
-    this.batcher.flush();
-    this.reader.close();
-    next();
-
+    context = this;
+    this.batchHistoryData(rows, 0, next);
+    this.reader.close(); 
   }.bind(this));
 }
 

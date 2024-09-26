@@ -20,6 +20,26 @@ var subscriptions = [
     handler: 'processMarketStart'
   },
   {
+    emitter: 'market',
+    event: 'lastTrades',
+    handler: 'processLastTrades'
+  },
+  {
+    emitter: 'market',
+    event: 'orderbook',
+    handler: 'processOrderbook'
+  },
+  {
+    emitter: 'telegrambot',
+    event: 'advice',
+    handler: 'processAdvice'
+  },
+  {
+    emitter: ['trader', 'paperTrader'],
+    event: 'advice',
+    handler: 'processAdvice'
+  },
+  {
     emitter: 'tradingAdvisor',
     event: 'stratWarmupCompleted',
     handler: 'processStratWarmupCompleted'
@@ -28,6 +48,21 @@ var subscriptions = [
     emitter: 'tradingAdvisor',
     event: 'advice',
     handler: 'processAdvice'
+  },
+  {
+    emitter: 'cloudConnector',
+    event: 'remoteAdvice',
+    handler: 'processRemoteAdvice'
+  },
+  {
+    emitter: 'cloudConnector',
+    event: 'remoteCandle',
+    handler: 'processRemoteCandle'
+  },
+  {
+    emitter: 'cloudConnector',
+    event: 'remoteOrderbook',
+    handler: 'processRemoteOrderbook'
   },
   {
     emitter: 'tradingAdvisor',
@@ -43,6 +78,11 @@ var subscriptions = [
     emitter: 'tradingAdvisor',
     event: 'stratNotification',
     handler: 'processStratNotification'
+  },
+  {
+    emitter: 'tradingAdvisor',
+    event: 'indicator',
+    handler: 'processIndicator'
   },
   {
     emitter: ['trader', 'paperTrader'],

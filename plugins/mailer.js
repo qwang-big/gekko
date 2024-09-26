@@ -97,7 +97,7 @@ Mailer.prototype.processCandle = function(candle, done) {
 };
 
 Mailer.prototype.processAdvice = function(advice) {
-
+  if (advice.recommendation == undefined) return;
   if (advice.recommendation == "soft" && mailConfig.muteSoft) return;
 
   var text = [
@@ -117,6 +117,52 @@ Mailer.prototype.processAdvice = function(advice) {
 
   this.mail(subject, text);
 };
+
+
+Mailer.prototype.processTradeInitiated = function(trade) {
+  var text = [
+    'Gekko initiated the trading at ',
+    config.watch.exchange,
+    ' to ',
+    trade.action.toUpperCase() + ' ' + config.watch.asset,
+    '.\n\nThe current ',
+    config.watch.asset,
+    ' price is ',
+    config.watch.currency,
+    ' ',
+    this.price,
+    '\n\nTrade initiated (UTC):  ',
+    trade.date.format('YYYY-MM-DD H:mm:ss')
+  ].join('');
+
+  var subject = 'Trade initiated: ' + trade.action.toUpperCase();
+
+  this.mail(subject, text);
+}
+
+
+Mailer.prototype.processTradeCompleted = function(trade) {
+
+  var text = [
+    'Gekko has just completed the automated trading to ',
+    trade.action.toUpperCase() + ' ' + config.watch.asset,
+    '.\n\nTrade amount: ',
+    trade.amount,
+    ' ',
+    config.watch.asset,
+    '\nTrade price: ',
+    trade.price,
+    ' ',
+    config.watch.currency,
+    '\n\nTrade completed (UTC):  ',
+    trade.date.format('YYYY-MM-DD HH:mm:ss')
+  ].join('');
+
+  var subject = 'Trade completed: ' + trade.action.toUpperCase();
+
+  this.mail(subject, text);
+}
+
 
 Mailer.prototype.processStratNotification = function({ content }) {
   const subject = `New notification from ${config.tradingAdvisor.method}`;

@@ -78,6 +78,7 @@ const recoverableErrors = [
   'CONNREFUSED',
   'NOTFOUND',
   'Error -1021',
+  'Error -2011',
   'Response code 429',
   'Response code 5',
   'Response code 403',
@@ -114,6 +115,11 @@ Trader.prototype.handleResponse = function(funcName, callback) {
         console.log(new Date, 'cancelOrder', 'UNKNOWN_ORDER');
         // order got filled in full before it could be
         // cancelled, meaning it was NOT cancelled.
+        return callback(false, {filled: true});
+      }
+
+      if(funcName === 'cancelOrder' && error.message.includes('Error -2011')) {
+        console.log(new Date, 'cancelOrder', 'Error -2011');
         return callback(false, {filled: true});
       }
 
@@ -173,6 +179,29 @@ Trader.prototype.getTrades = function(since, callback, descending) {
   const fetch = cb => this.binance.aggTrades(reqData, this.handleResponse('getTrades', cb));
   retry(undefined, fetch, processResults);
 };
+
+
+Trader.prototype.getOrderbook = function(callback) {  
+  const handle = (err, ob) => {
+    if (err) return callback(err);
+
+    var obStats = {};
+    //_.each(ob.result[this.pair], function(trade) {
+    //}, this);
+    if (this.exchange != undefined) obStats.exchange = this.exchange;
+    obStats.pair = this.asset + this.currency;
+    let pair = ob;
+    obStats.asks = pair.asks;
+    obStats.bids = pair.bids;
+
+    callback(undefined, obStats);
+  };
+
+  const reqData = { symbol: this.pair, limit: 1000 }
+  const fetch = cb => this.binance.depth(reqData, this.handleResponse('getOrderbook', cb, true));
+  retry(null, fetch, handle);
+}
+
 
 Trader.prototype.getPortfolio = function(callback) {
   const setBalance = (err, data) => {

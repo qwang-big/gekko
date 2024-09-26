@@ -29,6 +29,31 @@ var util = {
       util.die('Cannot find the specified config file.', true);
 
     _config = require(util.dirs().gekko + program.config);
+
+    if(program.set) {
+      //e.g. program.set => 'tradingAdvisor.candleSize=1,debug=true'
+      let arrset = program.set.split(',');
+
+      if (arrset.length == 0)
+        arrset.push(program.set);
+
+      for(let i=0; i<arrset.length; i++) {
+        let args = arrset[i].split('=');
+        if (args.length != 2)
+          util.die('Invalid argument usage: --set');
+        
+        let prop = args[0].split('.');
+        if (prop.length === 2)
+          this.setConfigProperty(prop[0], prop[1], JSON.parse(args[1])); 
+        else  
+          this.setConfigProperty(null, args[0], JSON.parse(args[1]));
+      }
+    }
+
+    if (_config.adapter == 'nodb' && (_config.cloudConnector == undefined || _config.cloudConnector.enabled == false || _config.cloudConnector.useCloudMarket == false)) {
+      util.die('Invalid config setting. config.adapter = \'nodb\' is only valid when using the Gekko Cloud market.', true);
+    }
+
     return _config;
   },
   // overwrite the whole config
@@ -74,7 +99,7 @@ var util = {
     }
   },
   logVersion: function() {
-    return  `Gekko version: v${util.getVersion()}`
+    return  `Green Gekko version: v${util.getVersion()}`
     + `\nNodejs version: ${process.version}`;
   },
   die: function(m, soft) {
@@ -173,6 +198,7 @@ program
   .option('-c, --config <file>', 'Config file')
   .option('-b, --backtest', 'backtesting mode')
   .option('-i, --import', 'importer mode')
+  .option('-s, --set <property>=<value>', 'override a config option, e.g. --set debug=true')
   .option('--ui', 'launch a web UI')
   .parse(process.argv);
 

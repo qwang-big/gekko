@@ -35,7 +35,7 @@ const connectionString = config.postgresql.connectionString;
 const checkClient = new pg.Pool({
   connectionString: connectionString + '/postgres',
 });
-const pool = new pg.Pool({
+var pool = new pg.Pool({
   connectionString: connectionString + '/' + dbName,
 });
 
@@ -45,10 +45,25 @@ const pool = new pg.Pool({
 // user will need appropriate rights.
 checkClient.connect((err, client, done) => {
   if(err) {
+    log.info('Unable to connect to PostgreSQL db. Exit.');
     util.die(err);
   }
 
   log.debug("Check database exists: " + dbName);
+  client.query("SELECT version(), current_setting('server_version_num') as vnumber", null,
+    (err, res) => {
+      if(err) {
+        util.die(err);
+      }
+
+      if (res.rows[0] === undefined || Number(res.rows[0].vnumber) < 90500) {
+        log.info('DB version:', res.rows[0].version);
+        log.info('You need at least PostgreSQL v9.5 to run Green Gekko. Exit.');
+        util.die();
+      } else {
+        log.debug('DB version:', res.rows[0].version.split(',')[0]);
+      }
+    });
   client.query("select count(*) from pg_catalog.pg_database where datname = $1", [dbName],
     (err, res) => {
       if(err) {
@@ -109,6 +124,5 @@ const upsertTables = () => {
     }
   });
 }
-
 
 module.exports = pool;

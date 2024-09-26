@@ -4,6 +4,7 @@ const util = require('../../core/util');
 const config = util.getConfig();
 const dirs = util.dirs();
 const log = require(dirs.core + 'log');
+const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
 const ENV = util.gekkoEnv();
 const mode = util.gekkoMode();
@@ -65,8 +66,20 @@ var Base = function(settings) {
   if(!this.onTrade)
     this.onTrade = function() {};
 
-  // let's run the implemented starting point
-  this.init();
+  if(!this.onAdvice)
+    this.onAdvice = function() {};
+
+  if(!this.onRemoteAdvice)
+    this.onRemoteAdvice = function() {};
+
+    if(!this.onRemoteOrderbook)
+    this.onRemoteOrderbook = function() {};
+
+  if(!this.onCandle)
+    this.onCandle = function() {};
+
+  if(!this.onRemoteCandle)
+    this.onRemoteCandle = function() {};
 
   if(_.isNumber(this.requiredHistory)) {
     log.debug('Ignoring strategy\'s required history, using the "config.tradingAdvisor.historySize" instead.');
@@ -75,7 +88,13 @@ var Base = function(settings) {
 
   if(!config.debug || !this.log)
     this.log = function() {};
+}
 
+// teach our base trading method events
+util.makeEventEmitter(Base);
+
+
+Base.prototype.startRunner = function() {
   this.setup = true;
 
   if(_.size(this.asyncIndicatorRunner.talibIndicators) || _.size(this.asyncIndicatorRunner.tulipIndicators))
@@ -89,7 +108,6 @@ util.makeEventEmitter(Base);
 
 Base.prototype.tick = function(candle, done) {
   this.age++;
-
   const afterAsync = () => {
     this.calculateSyncIndicators(candle, done);
   }
@@ -131,15 +149,18 @@ Base.prototype.calculateSyncIndicators = function(candle, done) {
   return done();
 }
 
-Base.prototype.propogateTick = function(candle) {
+Base.prototype.propogateTick = async function(candle) {
   this.candle = candle;
-  this.update(candle);
 
+  //strategy developers can implement their UPDATE function with or without async 
+  if (Base.prototype['update'] instanceof AsyncFunction)
+     await this.update(candle);
+  else
+     this.update(candle);
+  
   this.processedTicks++;
   var isAllowedToCheck = this.requiredHistory <= this.age;
-
   if(!this.completedWarmup) {
-
     // in live mode we might receive more candles
     // than minimally needed. In that case check
     // whether candle start time is > startTime
@@ -149,11 +170,9 @@ Base.prototype.propogateTick = function(candle) {
       const startTimeMinusCandleSize = startTime
         .clone()
         .subtract(this.tradingAdvisor.candleSize, "minutes");
-
       isPremature = candle.start < startTimeMinusCandleSize;
     }
-
-    if(isAllowedToCheck && !isPremature) {
+    if(isAllowedToCheck /*&& !isPremature*/) {
       this.completedWarmup = true;
       this.emit(
         'stratWarmupCompleted',
@@ -164,7 +183,12 @@ Base.prototype.propogateTick = function(candle) {
 
   if(this.completedWarmup) {
     this.log(candle);
-    this.check(candle);
+
+    //strategy developers can implement their CHECK function with or without async 
+    if (Base.prototype['check'] instanceof AsyncFunction)
+      await this.check(candle);
+    else
+      this.check(candle);
 
     if(
       this.asyncTick &&
@@ -206,14 +230,14 @@ Base.prototype.propogateTick = function(candle) {
 Base.prototype.processTrade = function(trade) {
   if(
     this._pendingTriggerAdvice &&
-    trade.action === 'sell' &&
-    this._pendingTriggerAdvice === trade.adviceId
+    trade.action === 'sell' //&&
+    //this._pendingTriggerAdvice === trade.adviceId
   ) {
     // This trade came from a trigger of the previous advice,
     // update stored direction
     this._currentDirection = 'short';
     this._pendingTriggerAdvice = null;
-  }
+  };
 
   this.onTrade(trade);
 }
@@ -238,6 +262,10 @@ Base.prototype.addIndicator = function(name, type, parameters) {
   // some indicators need a price stream, others need full candles
 }
 
+Base.prototype.emitIndicator = function(indicator) {
+  this.emit('indicator', indicator);
+}
+
 Base.prototype.advice = function(newDirection) {
   // ignore legacy soft advice
   if(!newDirection) {
@@ -252,7 +280,11 @@ Base.prototype.advice = function(newDirection) {
     }
 
     if(newDirection.direction === this._currentDirection) {
-      return;
+      if (newDirection.setSellAmount == undefined && newDirection.setBuyAmount == undefined) { 
+        //allow double advice on partial buy/sells
+        log.debug('Got advice to go', newDirection.direction, 'again - skip this double advice!');
+        return;
+      }
     }
 
     if(_.isObject(newDirection.trigger)) {
@@ -268,29 +300,26 @@ Base.prototype.advice = function(newDirection) {
 
         if(trigger.trailPercentage && !trigger.trailValue) {
           trigger.trailValue = trigger.trailPercentage / 100 * this.candle.close;
-          log.info('[StratRunner] Trailing stop trail value specified as percentage, setting to:', trigger.trailValue);
+          //log.info('[StratRunner] Trailing stop trail value specified as percentage, setting to:', trigger.trailValue);
         }
       }
     }
-
-    newDirection = newDirection.direction;
+    newDir = newDirection.direction;
+  } else {
+    newDir = newDirection;
   }
 
-  if(newDirection === this._currentDirection) {
-    return;
-  }
-
-  if(newDirection === 'short' && this._pendingTriggerAdvice) {
+  if(newDir === 'short' && this._pendingTriggerAdvice) {
     this._pendingTriggerAdvice = null;
   }
 
-  this._currentDirection = newDirection;
+  this._currentDirection = newDir;
 
   this.propogatedAdvices++;
 
   const advice = {
     id: 'advice-' + this.propogatedAdvices,
-    recommendation: newDirection
+    recommendation: newDir
   };
 
   if(trigger) {
@@ -299,6 +328,12 @@ Base.prototype.advice = function(newDirection) {
   } else {
     this._pendingTriggerAdvice = null;
   }
+
+  if (newDirection.setTakerLimit !== undefined) advice.setTakerLimit = newDirection.setTakerLimit;
+  if (newDirection.setSellAmount !== undefined) advice.setSellAmount = newDirection.setSellAmount;
+  if (newDirection.setBuyAmount !== undefined) advice.setBuyAmount = newDirection.setBuyAmount;
+  if (newDirection.origin !== undefined) advice.origin = newDirection.origin;
+  if (newDirection.infomsg !== undefined) advice.infomsg = newDirection.infomsg;
 
   this.emit('advice', advice);
 

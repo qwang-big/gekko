@@ -82,6 +82,13 @@ You can implement the EMA like so:
 
 *[More info on investopedia](https://www.investopedia.com/terms/d/double-exponential-moving-average.asp).*
 
+### TEMA
+
+> **What is the 'Triple Exponential Moving Average - TEMA'**
+> "The triple exponential moving average, or TEMA, was developed by Patrick Mulloy in 1994 to filter out volatility from conventional moving averages."
+
+*[More info on investopedia](https://www.investopedia.com/terms/t/triple-exponential-moving-average.asp).*
+
 ### LRC
 
 > **What is the 'Linear Regression Channel - LRC'**

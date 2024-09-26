@@ -2,23 +2,30 @@ var _ = require('lodash');
 var util = require('../../core/util.js');
 var config = util.getConfig();
 var log = require(util.dirs().core + 'log');
+var moment = require('moment');
 
 var handle = require('./handle');
 var postgresUtil = require('./util');
+const pg = require('pg');
 
 const { Query } = require('pg');
 
-var Reader = function() {
+var Reader = function(mydb) {
   _.bindAll(this);
-  this.db = handle;
+
+  if (mydb === undefined) {
+     this.db = handle;
+  }
+  else {
+     this.db = new pg.Pool({ connectionString: config.postgresql.connectionString + '/' + mydb, });
+  }
 }
 
 // returns the furthest point (up to `from`) in time we have valid data from
 Reader.prototype.mostRecentWindow = function(from, to, next) {
   to = to.unix();
   from = from.unix();
-
-  var maxAmount = to - from + 1;
+  var maxAmount = ((to - from) / 60) + 1;
   
   this.db.connect((err, client, done) => {
 
@@ -38,7 +45,16 @@ Reader.prototype.mostRecentWindow = function(from, to, next) {
           return next(false);
 
         log.error(err);
-        return util.die('DB error while reading mostRecentWindow');
+
+        function sleep(ms) {
+          return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        const waitNdie = async function() {
+          await sleep(1000);
+          return util.die('DB error while reading mostRecentWindow');
+        }
+        waitNdie();
       }
     });
 
@@ -61,12 +77,14 @@ Reader.prototype.mostRecentWindow = function(from, to, next) {
 
         return next({
           from: from,
-          to: to
+          to: to,
+          consistency: 'Full db data without gaps!'
         });
       }
 
       // we have at least one gap, figure out where
       var mostRecent = _.first(rows).start;
+      var leastRecent = _.last(rows).start;
 
       var gapIndex = _.findIndex(rows, function(r, i) {
         return r.start !== mostRecent - i * 60;
@@ -75,18 +93,19 @@ Reader.prototype.mostRecentWindow = function(from, to, next) {
       // if there was no gap in the records, but
       // there were not enough records.
       if(gapIndex === -1) {
-        var leastRecent = _.last(rows).start;
         return next({
           from: leastRecent,
-          to: mostRecent
+          to: mostRecent,
+          consistency: 'No db data gap, but missing history (available from ' + moment.unix(leastRecent).utc().format() + ' to ' + moment.unix(mostRecent).utc().format() + ')'
         });
       }
 
       // else return mostRecent and the
       // the minute before the gap
       return next({
-        from: rows[ gapIndex - 1 ].start,
-        to: mostRecent
+        from: leastRecent,
+        to: rows[ gapIndex - 1 ].start,
+        consistency: 'DB data has a gap at ' + moment.unix(rows[ gapIndex - 1 ].start).utc().format()
       });
     });
   });  
@@ -110,14 +129,19 @@ Reader.prototype.tableExists = function (name, next) {
   });  
 }
 
-Reader.prototype.get = function(from, to, what, next) {
+Reader.prototype.get = function(from, to, what, next, mytable) {
   if(what === 'full'){
     what = '*';
+  }
+
+  var querytable = postgresUtil.table('candles');
+  if (mytable !== undefined) {
+    querytable = mytable;
   }
   
   this.db.connect((err,client,done) => {
     var query = client.query(new Query(`
-    SELECT ${what} from ${postgresUtil.table('candles')}
+    SELECT ${what} from ${querytable}
     WHERE start <= ${to} AND start >= ${from}
     ORDER BY start ASC
     `));

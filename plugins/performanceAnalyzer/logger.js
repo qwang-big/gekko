@@ -8,6 +8,11 @@ const util = require('../../core/util.js');
 const dirs = util.dirs();
 const mode = util.gekkoMode();
 const log = require(dirs.core + 'log');
+const colors = require('colors/safe');
+
+const config = util.getConfig();
+const perfConfig = config.performanceAnalyzer;
+const shortTrading = perfConfig.shortTrading != undefined ? perfConfig.shortTrading : false;
 
 const Logger = function(watchConfig) {
   this.currency = watchConfig.currency;
@@ -33,7 +38,7 @@ Logger.prototype.logReport = function(trade, report) {
   log.info(`(PROFIT REPORT) current balance:\t\t ${current} ${this.currency}`);
   log.info(
     `(PROFIT REPORT) profit:\t\t\t\t ${this.round(report.profit)} ${this.currency}`,
-    `(${this.round(report.relativeProfit)}%)`
+    `(${report.relativeProfit > 0 ? colors.green(this.round(report.relativeProfit)+'%') : colors.green(this.round(report.relativeProfit)+'%')})`
   );
 }
 
@@ -63,23 +68,51 @@ if(mode === 'backtest') {
     var at = trade.date.format('YYYY-MM-DD HH:mm:ss');
 
 
-    if(trade.action === 'sell')
+    if (!shortTrading) {
+      if(trade.action === 'sell') {
+          let tradeType = trade.trigger.origin != undefined && trade.trigger.origin != 'advice' ? trade.trigger.origin : '';
+          let trailPercent = tradeType == 'trailingStop' ? ' ' + trade.trigger.trailPercentage + '%' : '';
+          let trailSLInfo = tradeType !== '' && trailPercent !== '' ? ` (${tradeType}${trailPercent})` : '';
+
+          log.info(
+            `${at}: Paper trader simulated a SELL${trailSLInfo} @ ${trade.price.toFixed(2)} ${this.currency}`,
+            `\t${this.round(trade.portfolio.currency)}`,
+            `${this.currency} <= ${this.round(trade.portfolio.asset)}`,
+            `${this.asset}`
+          );
+      }
+      else if(trade.action === 'buy') {
+        log.info(
+          `${at}: Paper trader simulated a BUY @ ${trade.price.toFixed(2)} ${this.currency}`,
+          `\t\t${this.round(trade.portfolio.currency)}`,
+          `${this.currency}\t=> ${this.round(trade.portfolio.asset)}`,
+          `${this.asset}`
+        );
+      }
+    }
+
+    if (shortTrading) {
+      if(trade.action === 'sell') {
+        let tradeType = trade.trigger.origin != undefined && trade.trigger.origin != 'advice' ? trade.trigger.origin : '';
+        let trailPercent = tradeType == 'trailingStop' ? ' ' + trade.trigger.trailPercentage + '%' : '';
+        let trailSLInfo = tradeType !== '' && trailPercent !== '' ? ` (${tradeType}${trailPercent})` : '';
 
         log.info(
-          `${at}: Paper trader simulated a SELL`,
+          `${at}: Paper trader simulated an OPEN SHORT position${trailSLInfo} @ ${trade.price.toFixed(2)} ${this.currency}`,
           `\t${this.round(trade.portfolio.currency)}`,
           `${this.currency} <= ${this.round(trade.portfolio.asset)}`,
           `${this.asset}`
         );
-
-    else if(trade.action === 'buy')
-
-      log.info(
-        `${at}: Paper trader simulated a BUY`,
-        `\t${this.round(trade.portfolio.currency)}`,
-        `${this.currency}\t=> ${this.round(trade.portfolio.asset)}`,
-        `${this.asset}`
-      );
+      }
+      else if(trade.action === 'buy') {
+        log.info(
+          `${at}: Paper trader simulated a CLOSE SHORT position @ ${trade.price.toFixed(2)} ${this.currency}`,
+          `\t\t${this.round(trade.portfolio.currency)}`,
+          `${this.currency}\t=> ${this.round(trade.portfolio.asset)}`,
+          `${this.asset}`
+        );
+      }
+    }
   }
 
   Logger.prototype.finalize = function(report) {
@@ -98,12 +131,13 @@ if(mode === 'backtest') {
     log.info();
     log.info(`(PROFIT REPORT) start price:\t\t\t ${report.startPrice} ${this.currency}`);
     log.info(`(PROFIT REPORT) end price:\t\t\t ${report.endPrice} ${this.currency}`);
-    log.info(`(PROFIT REPORT) Market:\t\t\t\t ${this.round(report.market)}%`);
+    log.info(`(PROFIT REPORT) Market:\t\t\t\t ${report.market > 0 ? colors.green(this.round(report.market)) : colors.red(this.round(report.market)+'%')}`);
     log.info();
     log.info(`(PROFIT REPORT) amount of trades:\t\t ${report.trades}`);
 
     this.logReport(null, report);
 
+    log.info(`(PROFIT REPORT) alpha:\t\t\t\t ${report.alpha}%`);
     log.info(
       `(PROFIT REPORT) simulated yearly profit:\t ${report.yearlyProfit}`,
       `${this.currency} (${report.relativeYearlyProfit}%)`
@@ -111,6 +145,11 @@ if(mode === 'backtest') {
 
     log.info(`(PROFIT REPORT) sharpe ratio:\t\t\t ${report.sharpe}`);
     log.info(`(PROFIT REPORT) expected downside:\t\t ${report.downside}`);
+
+    if (report.relativeProfit > 300) {
+      log.info(`(PROFIT REPORT) ${colors.yellow('Ole, Ole, Ole, dicke (• )( •) Kartoffelsalat, Lambo time :-)')}`);
+    }
+  
     log.info(`(PROFIT REPORT) ratio roundtrips:\t\t ${report.ratioRoundTrips}%`);
   }
 

@@ -42,6 +42,9 @@ class StickyOrder extends BaseOrder {
   }
 
   create(side, rawAmount, params = {}) {
+    this.createRetry = 0;
+    this.setTakerLimit = params.setTakerLimit;
+
     if(this.completed || this.completing) {
       return false;
     }
@@ -96,7 +99,6 @@ class StickyOrder extends BaseOrder {
   }
 
   calculatePrice(ticker) {
-
     const r = this.roundPrice;
 
     if(this.initialLimit && !this.id) {
@@ -111,7 +113,7 @@ class StickyOrder extends BaseOrder {
       }
 
       if(!this.outbid) {
-        return r(ticker.bid);
+        return r(Number(ticker.bid));
       }
 
       const outbidPrice = this.outbidPrice(ticker.bid, true);
@@ -129,7 +131,7 @@ class StickyOrder extends BaseOrder {
       }
 
       if(!this.outbid) {
-        return r(ticker.ask);
+        return r(Number(ticker.ask));
       }
 
       const outbidPrice = this.outbidPrice(ticker.ask, false);
@@ -148,6 +150,15 @@ class StickyOrder extends BaseOrder {
     }
 
     const alreadyFilled = this.calculateFilled();
+  
+    let setTakerLimit = String(this.setTakerLimit);
+    if (setTakerLimit.charAt(setTakerLimit.length-1) == '%') {
+      if (setTakerLimit.slice(0,-1) > 0 && this.side === 'buy') this.price = this.roundPrice(Number(this.price) + Number(this.price*setTakerLimit.slice(0,-1)/100));
+      if (setTakerLimit.slice(0,-1) > 0 && this.side === 'sell') this.price = this.roundPrice(Number(this.price) - Number(this.price*setTakerLimit.slice(0,-1)/100));
+    } else {
+      if (this.setTakerLimit > 0 && this.side === 'buy') this.price = this.roundPrice(Number(this.price) + Number(this.setTakerLimit));
+      if (this.setTakerLimit > 0 && this.side === 'sell') this.price = this.roundPrice(Number(this.price) - Number(this.setTakerLimit));  
+    }
 
     this.submit({
       side: this.side,
@@ -379,10 +390,17 @@ class StickyOrder extends BaseOrder {
 
       if(!result.executed) {
         // not open and not executed means it never hit the book
-        console.log(this.side, this.status, this.id, 'not open not executed!', result);
-        this.rejected();
-        throw 'a';
-        return;
+        this.createRetry++;
+        if (this.createRetry > 3) {
+          console.log(this.side, this.status, this.id, 'not open not executed!', result);
+          this.rejected();
+          throw 'a';
+          return;
+        } else {
+          console.log('Error while opening a new order, will retry in 1 min. Attempt:', this.createRetry);
+          setTimeout(this.createOrder, 60000);
+          return;
+        }
       }
 
       // order got filled!

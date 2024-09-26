@@ -15,6 +15,7 @@ const Trader = function(config) {
     this.secret = config.secret;
     this.currency = config.currency.toUpperCase()
     this.asset = config.asset.toUpperCase();
+    this.exchange = config.exchange.toLowerCase();
   }
 
   this.name = 'kraken';
@@ -80,6 +81,11 @@ Trader.prototype.handleResponse = function(funcName, callback, nonMutating, payl
       if(includes(error.message, ['Rate limit exceeded'])) {
         error.notFatal = true;
         error.backoffDelay = 2500;
+      }
+
+      if(includes(error.message, ['Insufficient funds'])) {
+        console.log(new Date, 'Kraken: insufficientFunds');
+        error.type = 'insufficientFunds';
       }
 
       if(nonMutating && includes(error.message, unknownResultErrors)) {
@@ -203,9 +209,7 @@ Trader.prototype.getTrades = function(since, callback, descending) {
       callback(undefined, parsedTrades);
   };
 
-  const reqData = {
-    pair: this.pair
-  };
+  const reqData = { pair: this.pair };
 
   if(since) {
     // Kraken wants a tid, which is found to be timestamp_ms * 1000000 in practice. No clear documentation on this though
@@ -215,6 +219,29 @@ Trader.prototype.getTrades = function(since, callback, descending) {
   const fetch = cb => this.kraken.api('Trades', reqData, this.handleResponse('getTrades', cb, true));
   retry(null, fetch, handle);
 };
+
+
+Trader.prototype.getOrderbook = function(callback) {  
+  const handle = (err, ob) => {
+    if (err) return callback(err);
+
+    var obStats = {};
+    //_.each(ob.result[this.pair], function(trade) {
+    //}, this);
+    if (this.exchange != undefined) obStats.exchange = this.exchange;
+    obStats.pair = this.asset + this.currency;
+    let pair = ob.result[Object.keys(ob.result)[0]];
+    obStats.asks = pair.asks;
+    obStats.bids = pair.bids;
+
+    callback(undefined, obStats);
+  };
+
+  const reqData = { pair: this.pair }
+  const fetch = cb => this.kraken.api('Depth', reqData, this.handleResponse('getOrderbook', cb, true));
+  retry(null, fetch, handle);
+}
+
 
 Trader.prototype.getPortfolio = function(callback) {
   const handle = (err, data) => {
@@ -305,7 +332,8 @@ Trader.prototype.addOrder = function(tradeType, amount, price, callback) {
   const reqData = {
     pair: this.pair,
     type: tradeType.toLowerCase(),
-    ordertype: 'limit',
+    ordertype: this.ordertype === 'market' ? 'market' : 'limit',
+    trading_agreement: 'agree',
     price: price,
     volume: amount
   };
@@ -371,7 +399,7 @@ Trader.prototype.checkOrder = function(order, callback) {
     if(err) return callback(err);
 
     const result = data.result[order];
-
+console.log('Debug checkOrder', result.vol, result.vol_exec, result.status, result.vol_exec);
     callback(undefined, {
       executed: result.vol === result.vol_exec,
       open: result.status === 'open',

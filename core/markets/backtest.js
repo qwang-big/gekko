@@ -8,18 +8,23 @@ var moment = require('moment');
 var adapter = config[config.adapter];
 var Reader = require(dirs.gekko + adapter.path + '/reader');
 var daterange = config.backtest.daterange;
+var requiredHistory = config.tradingAdvisor.candleSize * config.tradingAdvisor.historySize;
 
 var to = moment.utc(daterange.to);
-var from = moment.utc(daterange.from);
+var from = moment.utc(daterange.from).subtract(requiredHistory, 'm');
 
 if(to <= from)
   util.die('This daterange does not make sense.')
+
+if(!config.paperTrader.enabled)
+  util.die('You need to enable the \"Paper Trader\" first to run a backtest.')
 
 if(!from.isValid())
   util.die('invalid `from`');
 
 if(!to.isValid())
   util.die('invalid `to`');
+    
 
 var Market = function() {
 
@@ -36,6 +41,22 @@ var Market = function() {
   log.write('');
 
   this.reader = new Reader();
+
+  console.log('');
+  log.info('Backtest time range:', moment.utc(daterange.from).format(), 'until', to.utc().format());
+  this.reader.mostRecentWindow(from, to, function(localData) {
+    log.info('DB candle consistency: ' + localData.consistency);
+    console.log();
+    
+    if (to.unix() !== localData.to) {
+      log.warn('Not enough history data to perform backtest. Exit!');
+      process.exit(1);
+    }
+  });
+  console.log('');
+
+  log.debug('*** Requested', requiredHistory, 'minutes of warmup history data, so reading db since', from.format(), 'UTC', 'and start backtest at', moment.utc(daterange.from).format(), 'UTC');
+
   this.batchSize = config.backtest.batchSize;
   this.iterator = {
     from: from.clone(),
@@ -57,7 +78,6 @@ Market.prototype.get = function() {
     this.iterator.to = to;
     this.ended = true;
   }
-
   this.reader.get(
     this.iterator.from.unix(),
     this.iterator.to.unix(),
@@ -101,8 +121,11 @@ Market.prototype.processCandles = function(err, candles) {
     to: this.iterator.from.clone().add(this.batchSize * 2, 'm').subtract(1, 's')
   }
 
-  if(!this.closed)
-    this.get();
+  if(!this.closed) {
+    setTimeout(() => {
+      this.get();
+    }, 5);
+  }
 }
 
 module.exports = Market;
